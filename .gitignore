@@ -220,3 +220,4 @@ __marimo__/
 # BudgetWise local state (rebuilt automatically, never commit)
 chroma_db/
 memory/
+tests/results/*.json
