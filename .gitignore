@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# BudgetWise local state (rebuilt automatically, never commit)
+chroma_db/
+memory/
