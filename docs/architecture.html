@@ -1,0 +1,138 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1500px; height: 1390px; background: #fff; font-family: "Times New Roman", Times, serif; color: #1e1b4b; position: relative; }
+  .b { position: absolute; padding: 10px 14px; font-size: 17px; line-height: 1.35; text-align: center; }
+  .b b.t { display: block; font-size: 20px; margin-bottom: 4px; }
+  .agent { background: #eef2ff; border: 2px solid #4f46e5; }
+  .user { background: #f1f5f9; border: 2px solid #475569; color: #0f172a; }
+  .tool { background: #ecfdf5; border: 2px solid #059669; color: #064e3b; font-size: 16px; padding: 7px 10px; line-height: 1.28; }
+  .tool b { font-size: 18px; }
+  .out { background: #fdf4ff; border: 2px solid #a21caf; color: #4a044e; }
+  .guard { background: #fef2f2; border: 2px solid #dc2626; color: #7f1d1d; }
+  .hand { background: #fefce8; border: 2px solid #ca8a04; color: #713f12; text-align: left; }
+  .cont { position: absolute; border: 1.5px solid #ecebc8; background: #fffffd; }
+  .cont .ct { position: absolute; top: 6px; width: 100%; text-align: center; font-size: 19px; color: #111; }
+  .new { display: inline-block; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #fff; background: #059669; border-radius: 3px; padding: 1px 5px; vertical-align: 2px; margin-left: 4px; }
+  .who { font-style: italic; font-size: 15px; color: #065f46; }
+  .lbl { position: absolute; font-size: 17px; background: #f0fdf4; padding: 1px 5px; color: #1e293b; }
+  .store { position: absolute; z-index: 10; text-align: center; font-size: 17px; color: #7c2d12; line-height: 1.3; }
+  code { font-family: "Courier New", monospace; font-size: 0.95em; }
+  svg { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; }
+</style></head><body>
+
+<!-- user input + input guardrail -->
+<div class="b user" style="left:110px;top:20px;width:340px;height:146px;">
+  <b class="t">User Input</b><i>'How am I doing this month, and what should I do this week?'</i><br>Problem: irregular income makes this hard to answer
+</div>
+<div class="b guard" style="left:500px;top:30px;width:340px;height:120px;">
+  <b class="t">Guardrail: Input check</b>Blocks investing, crypto, tax and retirement questions and card numbers. Polite refusal, no model call.
+</div>
+
+<!-- Agent 1 -->
+<div class="cont" style="left:110px;top:200px;width:730px;height:300px;"><div class="ct">Agent 1: Analyst</div></div>
+<div class="b agent" style="left:130px;top:238px;width:390px;height:244px;">
+  <b class="t">Persona, Role &amp; Reasoning</b>'Budgeting coach that finds the facts.'<br><br>
+  <b>Reasoning: ReAct</b><br>Thought → Action (call a tool) → Observation, repeated.<br><br>
+  Rule: MUST call a tool for every number. Fact question: answers itself. Plan question: hands off.
+</div>
+<div class="b agent" style="left:570px;top:300px;width:250px;height:100px;">
+  <b class="t">Model Backend</b>NRP <code>gpt-oss</code><br>(tool-calling LLM)
+</div>
+
+<!-- handoff -->
+<div class="b hand" style="left:270px;top:540px;width:570px;height:212px;">
+  <b class="t" style="text-align:center;">Handoff: <code>transfer_to_planner</code></b>
+  <b>Trigger:</b> the user asks for a plan, what to do this week, or how to reach their goal.<br>
+  <b>Payload (FinancialSnapshot):</b> safe-to-spend total and per day, days to payday, top spending category and 30-day total, income baseline, goal amount left and needed per week, last week's plan result.<br>
+  <b>Payload check:</b> every number must match a tool result.
+</div>
+
+<!-- Agent 2 -->
+<div class="cont" style="left:110px;top:792px;width:730px;height:268px;"><div class="ct">Agent 2: Planner</div></div>
+<div class="b agent" style="left:130px;top:830px;width:390px;height:212px;">
+  <b class="t">Persona, Role &amp; Reasoning</b>'Turns the facts into one plan for the next 7 days.'<br><br>
+  <b>Reasoning: chain-of-thought</b><br>Read snapshot → search guidance → choose savings, category, cut % → build plan → save it → explain why.
+</div>
+<div class="b agent" style="left:570px;top:880px;width:250px;height:100px;">
+  <b class="t">Model Backend</b>NRP <code>gpt-oss</code><br>(tool-calling LLM)
+</div>
+
+<!-- grounding guardrail + output -->
+<div class="b guard" style="left:270px;top:1100px;width:570px;height:96px;">
+  <b class="t">Guardrail: Grounding check</b>Every $ amount must match a tool result. Otherwise: retry once, then the answer is withheld.
+</div>
+<div class="b out" style="left:270px;top:1240px;width:570px;height:124px;">
+  <b class="t">Agent Output</b>
+  <b>Fact answer</b> (Analyst): 'You can safely spend $39.11/day until payday.'<br>
+  <b>Weekly plan</b> (Planner): daily limit $33.18, save $41.56, dining cap $62.84, reasons, and one action for today.
+</div>
+
+<!-- fact path label -->
+<div class="lbl" style="left:70px;top:610px;background:#fff;writing-mode:vertical-rl;transform:rotate(180deg);padding:4px 1px;">fact question (no handoff)</div>
+
+<!-- MCP server -->
+<div class="cont" style="left:900px;top:200px;width:370px;height:890px;"><div class="ct">MCP Server: 8 Tools</div></div>
+<div class="b tool" style="left:915px;top:240px;width:340px;height:92px;"><b>get_spending_by_category</b> (days=30)<br>Where money went, top category<br><span class="who">Analyst</span></div>
+<div class="b tool" style="left:915px;top:342px;width:340px;height:92px;"><b>get_safe_to_spend</b> ()<br>Balance − bills − buffer, per day<br><span class="who">Analyst</span></div>
+<div class="b tool" style="left:915px;top:444px;width:340px;height:92px;"><b>get_income_variability</b> (months=3)<br>Income swings, conservative baseline<br><span class="who">Analyst</span></div>
+<div class="b tool" style="left:915px;top:546px;width:340px;height:92px;"><b>get_goal_progress</b> ()<span class="new">NEW</span><br>Savings goal: amount left, needed per week<br><span class="who">Analyst</span></div>
+<div class="b tool" style="left:915px;top:648px;width:340px;height:92px;"><b>build_weekly_plan</b> ()<span class="new">NEW</span><br>Daily limit, savings, category cap<br><span class="who">Planner</span></div>
+<div class="b tool" style="left:915px;top:750px;width:340px;height:92px;"><b>search_budget_knowledge</b> ()<span class="new">NEW</span><br>Finds budgeting guidance (RAG)<br><span class="who">Analyst + Planner</span></div>
+<div class="b tool" style="left:915px;top:852px;width:340px;height:92px;"><b>check_last_plan</b> ()<span class="new">NEW</span><br>Last week's plan vs actual spending<br><span class="who">Analyst</span></div>
+<div class="b tool" style="left:915px;top:954px;width:340px;height:92px;"><b>save_plan</b> ()<span class="new">NEW</span><br>Remembers this week's plan<br><span class="who">Planner</span></div>
+
+<!-- stores (text over SVG cylinders) -->
+<div class="store" style="left:1305px;top:432px;width:180px;">Fake sample<br>financial data<br><span style="font-size:15px">profile.json<br>transactions.csv</span></div>
+<div class="store" style="left:1305px;top:746px;width:180px;"><b>Knowledge layer</b><br>ChromaDB vector DB<br><span style="font-size:15px">5 budgeting guides<br>(Penn State Ext., CFPB)</span></div>
+<div class="store" style="left:1305px;top:958px;width:180px;"><b>Memory</b><br>saved weekly plans<br><span style="font-size:15px">plan_history.json</span></div>
+
+<div class="lbl" style="left:846px;top:322px;">tool calls</div>
+<div class="lbl" style="left:846px;top:902px;">tool calls</div>
+<div class="lbl" style="left:712px;top:478px;background:#fff;color:#713f12;">plan question</div>
+
+
+<svg width="1500" height="1430">
+  <defs>
+    <marker id="m" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13 z" fill="#475569"/></marker>
+    <marker id="s" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto"><path d="M0,1 L10,5.5 L0,10 z" fill="#64748b"/></marker>
+    <marker id="y" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13 z" fill="#ca8a04"/></marker>
+  </defs>
+  <!-- cylinders -->
+  <g fill="#fff7ed" stroke="#c2410c" stroke-width="2">
+    <path d="M1305,418 v118 a90,16 0 0 0 180,0 v-118"/><ellipse cx="1395" cy="418" rx="90" ry="16"/>
+    <path d="M1305,732 v130 a90,16 0 0 0 180,0 v-130"/><ellipse cx="1395" cy="732" rx="90" ry="16"/>
+    <path d="M1305,944 v98 a90,16 0 0 0 180,0 v-98"/><ellipse cx="1395" cy="944" rx="90" ry="16"/>
+  </g>
+  <!-- main flow (thick, like M2) -->
+  <path d="M450,90 L496,90" stroke="#475569" stroke-width="3.5" fill="none" marker-end="url(#m)"/>
+  <path d="M700,150 C700,220 695,250 695,296" stroke="#475569" stroke-width="3.5" fill="none" marker-end="url(#m)"/>
+  <path d="M520,360 L566,350" stroke="#64748b" stroke-width="1.6" fill="none" marker-end="url(#s)"/>
+  <path d="M695,400 C695,470 600,490 600,536" stroke="#ca8a04" stroke-width="3.5" fill="none" marker-end="url(#y)"/>
+  <path d="M600,752 C600,820 695,830 695,876" stroke="#ca8a04" stroke-width="3.5" fill="none" marker-end="url(#y)"/>
+  <path d="M520,936 L566,930" stroke="#64748b" stroke-width="1.6" fill="none" marker-end="url(#s)"/>
+  <path d="M695,980 C695,1040 600,1050 600,1096" stroke="#475569" stroke-width="3.5" fill="none" marker-end="url(#m)"/>
+  <path d="M555,1196 L555,1236" stroke="#475569" stroke-width="3.5" fill="none" marker-end="url(#m)"/>
+  <!-- fact path: Agent 1 -> grounding guardrail (outside containers) -->
+  <path d="M130,440 C66,470 56,560 56,800 C56,1080 120,1148 266,1148" stroke="#475569" stroke-width="3.5" fill="none" marker-end="url(#m)"/>
+  <!-- tool calls -->
+  <path d="M820,350 C860,350 870,320 912,300" stroke="#64748b" stroke-width="1.6" fill="none" marker-end="url(#s)"/>
+  <path d="M820,930 C860,930 870,960 912,980" stroke="#64748b" stroke-width="1.6" fill="none" marker-end="url(#s)"/>
+  <path d="M912,280 L1255,280" stroke="none"/>
+  <!-- answers back to user (dotted, like M2) -->
+  <path d="M270,1330 C20,1330 16,600 18,200 C20,140 60,110 106,100" stroke="#64748b" stroke-width="1.6" stroke-dasharray="3 4" fill="none" marker-end="url(#s)"/>
+  <!-- tools -> stores (dotted) -->
+  <g stroke="#64748b" stroke-width="1.6" stroke-dasharray="3 4" fill="none" marker-end="url(#s)">
+    <path d="M1255,286 C1290,300 1290,410 1302,440"/>
+    <path d="M1255,388 C1280,400 1285,440 1302,460"/>
+    <path d="M1255,490 L1302,480"/>
+    <path d="M1255,592 C1285,580 1290,530 1302,510"/>
+    <path d="M1255,694 C1285,670 1290,560 1302,525"/>
+    <path d="M1255,796 L1302,796"/>
+    <path d="M1255,898 C1280,920 1290,970 1302,985"/>
+    <path d="M1255,1000 L1302,1000"/>
+  </g>
+</svg>
+<div class="lbl" style="left:2px;top:168px;background:#fff;font-size:15px;color:#475569;">answers</div>
+</body></html>
