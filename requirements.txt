@@ -1,4 +1,6 @@
 openai-agents
 mcp<2  # 2.x renamed FastMCP; the course code uses 1.x
 python-dotenv
+pydantic
+chromadb  # local vector database for the knowledge base (downloads a small embedding model on first run)
 pytest

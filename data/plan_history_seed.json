@@ -1,0 +1,14 @@
+{
+  "note": "FAKE SAMPLE DATA. One earlier weekly plan so the memory layer has something to compare against. Copied into memory/plan_history.json on first run.",
+  "plans": [
+    {
+      "week_start": "2026-09-21",
+      "saved_at": "2026-09-21T09:00:00",
+      "daily_limit": 35.00,
+      "focus_category": "dining",
+      "focus_category_cap": 60.00,
+      "save_this_week": 40.00,
+      "summary": "Keep spending under $35/day, cap dining at $60 for the week, move $40 to the emergency fund."
+    }
+  ]
+}

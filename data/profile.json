@@ -9,5 +9,11 @@
     {"name": "Rent", "amount": 1100.00, "due_date": "2026-10-01"},
     {"name": "Credit card payment", "amount": 60.00, "due_date": "2026-10-05"},
     {"name": "Internet", "amount": 65.00, "due_date": "2026-10-12"}
-  ]
+  ],
+  "savings_goal": {
+    "name": "Emergency fund",
+    "target": 500.00,
+    "saved_so_far": 120.00,
+    "deadline": "2026-12-01"
+  }
 }
