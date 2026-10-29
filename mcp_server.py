@@ -12,6 +12,7 @@ agent.py launches this file automatically (one connection per agent, each with i
 To run it alone: python mcp_server.py
 NOTE: never print() in this file - stdout is the MCP protocol channel.
 """
+
 import csv
 import hashlib
 import json
@@ -26,7 +27,9 @@ mcp = FastMCP("BudgetWise Tools", log_level="WARNING")  # keep the console quiet
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 KNOWLEDGE_DIR = ROOT / "knowledge"
-CHROMA_DIR = ROOT / "chroma_db"  # local vector store (git-ignored, rebuilt automatically)
+CHROMA_DIR = (
+    ROOT / "chroma_db"
+)  # local vector store (git-ignored, rebuilt automatically)
 MEMORY_FILE = ROOT / "memory" / "plan_history.json"  # saved weekly plans (git-ignored)
 SEED_FILE = DATA_DIR / "plan_history_seed.json"
 KNOWLEDGE_COLLECTION = "budget_knowledge"
@@ -95,7 +98,9 @@ def get_spending_by_category(days: int = 30) -> dict:
         "total_spent": round(total_spent, 2),
         "by_category": by_category,
         "top_category": by_category[0]["category"] if by_category else None,
-        "top_discretionary_category": discretionary[0]["category"] if discretionary else None,
+        "top_discretionary_category": (
+            discretionary[0]["category"] if discretionary else None
+        ),
     }
 
 
@@ -103,13 +108,15 @@ def get_spending_by_category(days: int = 30) -> dict:
 @mcp.tool()
 def get_safe_to_spend() -> dict:
     """Calculate how much money is safe to spend before the next paycheck:
-    balance minus bills due before payday minus the savings buffer, in total and per day."""
+    balance minus bills due before payday minus the savings buffer, in total and per day.
+    """
     p = _load_profile()
     as_of = date.fromisoformat(p["as_of"])
     payday = date.fromisoformat(p["next_paycheck_date"])
     days_left = max((payday - as_of).days, 1)
     bills = [
-        b for b in p["upcoming_bills"]
+        b
+        for b in p["upcoming_bills"]
         if as_of <= date.fromisoformat(b["due_date"]) <= payday
     ]
     bills_total = round(sum(b["amount"] for b in bills), 2)
@@ -124,7 +131,9 @@ def get_safe_to_spend() -> dict:
         "savings_buffer": p["savings_buffer"],
         "safe_to_spend_total": safe,
         "safe_to_spend_per_day": round(safe / days_left, 2),
-        "warning": "Bills and buffer already exceed your balance." if safe < 0 else None,
+        "warning": (
+            "Bills and buffer already exceed your balance." if safe < 0 else None
+        ),
     }
 
 
@@ -132,7 +141,8 @@ def get_safe_to_spend() -> dict:
 @mcp.tool()
 def get_income_variability(months: int = 3) -> dict:
     """Summarize how much monthly income varies over the last N complete months
-    (default 3): per-month income, average, lowest, highest, and a conservative baseline."""
+    (default 3): per-month income, average, lowest, highest, and a conservative baseline.
+    """
     if not isinstance(months, int) or months < 1 or months > 12:
         return {"error": "months must be a whole number between 1 and 12"}
     as_of = _as_of()
@@ -190,7 +200,9 @@ def get_goal_progress() -> dict:
         "target": g["target"],
         "saved_so_far": g["saved_so_far"],
         "remaining": remaining,
-        "percent_complete": round(100 * g["saved_so_far"] / g["target"], 1) if g["target"] else 0.0,
+        "percent_complete": (
+            round(100 * g["saved_so_far"] / g["target"], 1) if g["target"] else 0.0
+        ),
         "deadline": g["deadline"],
         "days_left": days_left,
         "weeks_left": round(days_left / 7, 1),
@@ -202,7 +214,9 @@ def get_goal_progress() -> dict:
 
 # --------------------------------------------------------------------------- Tool 5 (new in M3)
 @mcp.tool()
-def build_weekly_plan(save_this_week: float, focus_category: str, cut_percent: int = 20) -> dict:
+def build_weekly_plan(
+    save_this_week: float, focus_category: str, cut_percent: int = 20
+) -> dict:
     """Do the math for a 7-day spending plan. The Planner chooses the strategy; this tool
     calculates every dollar figure.
     save_this_week: dollars to move to the savings goal this week (0 or more).
@@ -213,16 +227,22 @@ def build_weekly_plan(save_this_week: float, focus_category: str, cut_percent: i
     as_of = _as_of()
     weekly_safe = _weekly_safe_to_spend()
     if weekly_safe <= 0:
-        return {"error": "Nothing is safe to spend before payday, so no weekly plan can be built. "
-                         "Focus on covering bills first."}
+        return {
+            "error": "Nothing is safe to spend before payday, so no weekly plan can be built. "
+            "Focus on covering bills first."
+        }
     try:
         save_this_week = round(float(save_this_week), 2)
         cut_percent = int(cut_percent)
     except (TypeError, ValueError):
-        return {"error": "save_this_week must be a number and cut_percent a whole number"}
+        return {
+            "error": "save_this_week must be a number and cut_percent a whole number"
+        }
     if save_this_week < 0 or save_this_week > weekly_safe:
-        return {"error": f"save_this_week must be between 0 and {weekly_safe} "
-                         f"(this week's safe-to-spend amount)"}
+        return {
+            "error": f"save_this_week must be between 0 and {weekly_safe} "
+            f"(this week's safe-to-spend amount)"
+        }
     if cut_percent < 0 or cut_percent > 50:
         return {"error": "cut_percent must be between 0 and 50"}
 
@@ -230,7 +250,9 @@ def build_weekly_plan(save_this_week: float, focus_category: str, cut_percent: i
     focus_category = str(focus_category).strip().lower()
     discretionary = sorted(c for c in last_30 if c not in FIXED_CATEGORIES)
     if focus_category not in discretionary:
-        return {"error": f"focus_category must be one of the discretionary categories: {', '.join(discretionary)}"}
+        return {
+            "error": f"focus_category must be one of the discretionary categories: {', '.join(discretionary)}"
+        }
 
     spending_allowance = round(weekly_safe - save_this_week, 2)
     daily_limit = round(spending_allowance / 7, 2)
@@ -268,7 +290,9 @@ def _load_memory() -> dict:
     if not MEMORY_FILE.exists():
         MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
         seed = json.loads(SEED_FILE.read_text(encoding="utf-8"))
-        MEMORY_FILE.write_text(json.dumps({"plans": seed["plans"]}, indent=2), encoding="utf-8")
+        MEMORY_FILE.write_text(
+            json.dumps({"plans": seed["plans"]}, indent=2), encoding="utf-8"
+        )
     return json.loads(MEMORY_FILE.read_text(encoding="utf-8"))
 
 
@@ -280,10 +304,16 @@ def reset_memory() -> None:
 
 # --------------------------------------------------------------------------- Tool 6 (new in M3)
 @mcp.tool()
-def save_plan(daily_limit: float, focus_category: str, focus_category_cap: float,
-              save_this_week: float, summary: str) -> dict:
+def save_plan(
+    daily_limit: float,
+    focus_category: str,
+    focus_category_cap: float,
+    save_this_week: float,
+    summary: str,
+) -> dict:
     """Remember this week's plan so next week's check-in can compare against it.
-    Pass the numbers exactly as build_weekly_plan returned them, plus a one-sentence summary."""
+    Pass the numbers exactly as build_weekly_plan returned them, plus a one-sentence summary.
+    """
     try:
         plan = {
             "week_start": _as_of().isoformat(),
@@ -295,11 +325,17 @@ def save_plan(daily_limit: float, focus_category: str, focus_category_cap: float
             "summary": str(summary)[:300],
         }
     except (TypeError, ValueError):
-        return {"error": "daily_limit, focus_category_cap and save_this_week must be numbers"}
+        return {
+            "error": "daily_limit, focus_category_cap and save_this_week must be numbers"
+        }
     memory = _load_memory()
     memory["plans"].append(plan)
     MEMORY_FILE.write_text(json.dumps(memory, indent=2), encoding="utf-8")
-    return {"saved": True, "week_start": plan["week_start"], "plans_in_memory": len(memory["plans"])}
+    return {
+        "saved": True,
+        "week_start": plan["week_start"],
+        "plans_in_memory": len(memory["plans"]),
+    }
 
 
 # --------------------------------------------------------------------------- Tool 7 (new in M3)
@@ -309,14 +345,20 @@ def check_last_plan() -> dict:
     since it started: flexible spending per day vs the daily limit, and focus-category
     spending vs its cap."""
     as_of = _as_of()
-    earlier = [p for p in _load_memory()["plans"] if date.fromisoformat(p["week_start"]) < as_of]
+    earlier = [
+        p
+        for p in _load_memory()["plans"]
+        if date.fromisoformat(p["week_start"]) < as_of
+    ]
     if not earlier:
         return {"has_previous_plan": False, "note": "No earlier plan in memory yet."}
     plan = max(earlier, key=lambda p: (p["week_start"], p["saved_at"]))
     start = date.fromisoformat(plan["week_start"])
     days = (as_of - start).days
     spent = _spending_between(start, as_of)
-    flexible_total = round(sum(v for c, v in spent.items() if c not in FIXED_CATEGORIES), 2)
+    flexible_total = round(
+        sum(v for c, v in spent.items() if c not in FIXED_CATEGORIES), 2
+    )
     per_day = round(flexible_total / days, 2)
     focus_spent = round(spent.get(plan["focus_category"], 0.0), 2)
     day_diff = round(per_day - plan["daily_limit"], 2)
@@ -329,13 +371,19 @@ def check_last_plan() -> dict:
         "daily_limit": plan["daily_limit"],
         "actual_flexible_spending": flexible_total,
         "actual_spending_per_day": per_day,
-        "daily_limit_result": (f"over by {abs(day_diff):.2f} per day" if day_diff > 0
-                               else f"under by {abs(day_diff):.2f} per day"),
+        "daily_limit_result": (
+            f"over by {abs(day_diff):.2f} per day"
+            if day_diff > 0
+            else f"under by {abs(day_diff):.2f} per day"
+        ),
         "focus_category": plan["focus_category"],
         "focus_category_cap": plan["focus_category_cap"],
         "actual_focus_spent": focus_spent,
-        "focus_result": (f"over the cap by {abs(focus_diff):.2f}" if focus_diff > 0
-                         else f"under the cap by {abs(focus_diff):.2f}"),
+        "focus_result": (
+            f"over the cap by {abs(focus_diff):.2f}"
+            if focus_diff > 0
+            else f"under the cap by {abs(focus_diff):.2f}"
+        ),
         "stuck_to_plan": day_diff <= 0 and focus_diff <= 0,
         "planned_savings": plan["save_this_week"],
     }
@@ -352,14 +400,23 @@ def _knowledge_chunks() -> list[dict]:
                 title = line[2:].strip()
             elif line.startswith("## "):
                 if section:
-                    chunks.append({"source": path.name, "title": title, "section": section, "body": body})
+                    chunks.append(
+                        {
+                            "source": path.name,
+                            "title": title,
+                            "section": section,
+                            "body": body,
+                        }
+                    )
                 section, body = line[3:].strip(), []
             elif line.startswith("Sources:"):
-                sources = line[len("Sources:"):].strip()
+                sources = line[len("Sources:") :].strip()
             elif line.strip():
                 body.append(line.strip())
         if section:
-            chunks.append({"source": path.name, "title": title, "section": section, "body": body})
+            chunks.append(
+                {"source": path.name, "title": title, "section": section, "body": body}
+            )
         for c in chunks:
             if c["source"] == path.name:
                 c["sources"] = sources
@@ -374,20 +431,31 @@ def _knowledge_collection():
     from chromadb.config import Settings
 
     chunks = _knowledge_chunks()
-    fingerprint = hashlib.sha256("".join(c["text"] + c["sources"] for c in chunks).encode()).hexdigest()[:16]
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR), settings=Settings(anonymized_telemetry=False))
+    fingerprint = hashlib.sha256(
+        "".join(c["text"] + c["sources"] for c in chunks).encode()
+    ).hexdigest()[:16]
+    client = chromadb.PersistentClient(
+        path=str(CHROMA_DIR), settings=Settings(anonymized_telemetry=False)
+    )
     try:
         col = client.get_collection(KNOWLEDGE_COLLECTION)
-        if (col.metadata or {}).get("fingerprint") == fingerprint and col.count() == len(chunks):
+        if (col.metadata or {}).get(
+            "fingerprint"
+        ) == fingerprint and col.count() == len(chunks):
             return col
         client.delete_collection(KNOWLEDGE_COLLECTION)
     except Exception:  # collection does not exist yet
         pass
-    col = client.create_collection(KNOWLEDGE_COLLECTION, metadata={"fingerprint": fingerprint})
+    col = client.create_collection(
+        KNOWLEDGE_COLLECTION, metadata={"fingerprint": fingerprint}
+    )
     col.add(
         ids=[f"{c['source']}#{i}" for i, c in enumerate(chunks)],
         documents=[c["text"] for c in chunks],
-        metadatas=[{"source": c["source"], "section": c["section"], "sources": c["sources"]} for c in chunks],
+        metadatas=[
+            {"source": c["source"], "section": c["section"], "sources": c["sources"]}
+            for c in chunks
+        ],
     )
     return col
 
@@ -402,7 +470,8 @@ def build_knowledge_index() -> int:
 def search_budget_knowledge(query: str, top_k: int = 3) -> dict:
     """Search the BudgetWise knowledge base (budgeting guidance from Penn State Extension and
     the CFPB, stored in a ChromaDB vector database) for passages that match the query.
-    Use it for strategy and advice, e.g. "irregular income baseline" or "cut dining out"."""
+    Use it for strategy and advice, e.g. "irregular income baseline" or "cut dining out".
+    """
     if not str(query).strip():
         return {"error": "query must not be empty"}
     top_k = max(1, min(int(top_k), 5))
@@ -416,7 +485,9 @@ def search_budget_knowledge(query: str, top_k: int = 3) -> dict:
             "original_sources": meta["sources"],
             "distance": round(dist, 3),
         }
-        for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0])
+        for doc, meta, dist in zip(
+            res["documents"][0], res["metadatas"][0], res["distances"][0]
+        )
     ]
     return {"query": query, "results": results}
 

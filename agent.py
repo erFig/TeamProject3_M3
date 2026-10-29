@@ -17,6 +17,7 @@ Usage:
     python agent.py --reset-memory     # forget saved plans (the sample plan comes back)
     python agent.py                    # chat mode ('quit' exits)
 """
+
 import ast
 import asyncio
 import json
@@ -62,8 +63,14 @@ MODEL = os.getenv("NRP_MODEL", "gpt-oss")
 SERVER_SCRIPT = ROOT / "mcp_server.py"
 MAX_TURNS = 20
 
-ANALYST_TOOLS = ["get_spending_by_category", "get_safe_to_spend", "get_income_variability",
-                 "get_goal_progress", "check_last_plan", "search_budget_knowledge"]
+ANALYST_TOOLS = [
+    "get_spending_by_category",
+    "get_safe_to_spend",
+    "get_income_variability",
+    "get_goal_progress",
+    "check_last_plan",
+    "search_budget_knowledge",
+]
 PLANNER_TOOLS = ["search_budget_knowledge", "build_weekly_plan", "save_plan"]
 
 
@@ -72,17 +79,31 @@ class FinancialSnapshot(BaseModel):
     """What the Analyst passes to the Planner. Every number must be copied from a tool result."""
 
     user_request: str = Field(description="The user's question, word for word.")
-    safe_to_spend_total: float = Field(description="get_safe_to_spend.safe_to_spend_total")
-    safe_to_spend_per_day: float = Field(description="get_safe_to_spend.safe_to_spend_per_day")
-    days_until_paycheck: int = Field(description="get_safe_to_spend.days_until_paycheck")
-    top_discretionary_category: str = Field(description="get_spending_by_category.top_discretionary_category")
-    top_discretionary_30_day_total: float = Field(description="30-day total of that category")
-    conservative_monthly_income: float = Field(description="get_income_variability.conservative_baseline")
+    safe_to_spend_total: float = Field(
+        description="get_safe_to_spend.safe_to_spend_total"
+    )
+    safe_to_spend_per_day: float = Field(
+        description="get_safe_to_spend.safe_to_spend_per_day"
+    )
+    days_until_paycheck: int = Field(
+        description="get_safe_to_spend.days_until_paycheck"
+    )
+    top_discretionary_category: str = Field(
+        description="get_spending_by_category.top_discretionary_category"
+    )
+    top_discretionary_30_day_total: float = Field(
+        description="30-day total of that category"
+    )
+    conservative_monthly_income: float = Field(
+        description="get_income_variability.conservative_baseline"
+    )
     goal_name: str = Field(description="get_goal_progress.goal_name")
     goal_remaining: float = Field(description="get_goal_progress.remaining")
     goal_needed_per_week: float = Field(description="get_goal_progress.needed_per_week")
-    last_plan_result: str = Field(description="One sentence summarizing check_last_plan, "
-                                              "e.g. 'dining was over the 60.00 cap by 5.38'")
+    last_plan_result: str = Field(
+        description="One sentence summarizing check_last_plan, "
+        "e.g. 'dining was over the 60.00 cap by 5.38'"
+    )
 
 
 # ============================================================================ shared run state
@@ -92,7 +113,9 @@ class BudgetWiseState:
 
     question: str
     verbose: bool = True
-    tool_outputs: list[str] = field(default_factory=list)  # evidence for the grounding guardrail
+    tool_outputs: list[str] = field(
+        default_factory=list
+    )  # evidence for the grounding guardrail
     tools_called: list[tuple[str, str]] = field(default_factory=list)  # (agent, tool)
     snapshot: FinancialSnapshot | None = None
     payload_mismatches: list[str] = field(default_factory=list)
@@ -108,14 +131,21 @@ def _short(result: object, limit: int = 170) -> str:
     text = str(result)
     try:
         data = ast.literal_eval(text) if text.startswith("{'") else json.loads(text)
-        if isinstance(data, dict) and "text" in data and len(data) <= 3:  # MCP text content wrapper
+        if (
+            isinstance(data, dict) and "text" in data and len(data) <= 3
+        ):  # MCP text content wrapper
             data = json.loads(data["text"])
         if isinstance(data, dict):
             if "results" in data:  # knowledge search
-                text = "; ".join(f"{r['source_file']} > {r['section']}" for r in data["results"])
+                text = "; ".join(
+                    f"{r['source_file']} > {r['section']}" for r in data["results"]
+                )
             else:
-                text = ", ".join(f"{k}={v}" for k, v in data.items()
-                                 if not isinstance(v, (list, dict)) and v is not None)
+                text = ", ".join(
+                    f"{k}={v}"
+                    for k, v in data.items()
+                    if not isinstance(v, (list, dict)) and v is not None
+                )
     except (ValueError, TypeError, KeyError):
         pass
     return text if len(text) <= limit else text[:limit] + " ..."
@@ -129,13 +159,26 @@ class StepLogger(RunHooks):
         _say(context.context, f"\n[{agent.name}] working...")
 
     async def on_llm_end(self, context, agent, response):
-        for item in response.output:  # gpt-oss returns its reasoning; show it as the ReAct "Thought"
+        for (
+            item
+        ) in (
+            response.output
+        ):  # gpt-oss returns its reasoning; show it as the ReAct "Thought"
             if getattr(item, "type", "") == "reasoning":
-                parts = [getattr(p, "text", "") for p in (getattr(item, "content", None) or [])]
-                parts += [getattr(p, "text", "") for p in (getattr(item, "summary", None) or [])]
+                parts = [
+                    getattr(p, "text", "")
+                    for p in (getattr(item, "content", None) or [])
+                ]
+                parts += [
+                    getattr(p, "text", "")
+                    for p in (getattr(item, "summary", None) or [])
+                ]
                 thought = " ".join(p for p in parts if p).strip().replace("\n", " ")
                 if thought:
-                    _say(context.context, f"  Thought: {thought[:220]}{' ...' if len(thought) > 220 else ''}")
+                    _say(
+                        context.context,
+                        f"  Thought: {thought[:220]}{' ...' if len(thought) > 220 else ''}",
+                    )
 
     async def on_tool_start(self, context, agent, tool):
         args = getattr(context, "tool_arguments", "") or ""
@@ -150,7 +193,9 @@ class StepLogger(RunHooks):
         _say(context.context, f"\n[handoff] {from_agent.name} -> {to_agent.name}")
 
 
-async def on_handoff_to_planner(ctx: RunContextWrapper[BudgetWiseState], snapshot: FinancialSnapshot) -> None:
+async def on_handoff_to_planner(
+    ctx: RunContextWrapper[BudgetWiseState], snapshot: FinancialSnapshot
+) -> None:
     """Runs when the Analyst hands off. Stores the payload and checks its numbers against the tools."""
     state = ctx.context
     state.snapshot = snapshot
@@ -159,26 +204,39 @@ async def on_handoff_to_planner(ctx: RunContextWrapper[BudgetWiseState], snapsho
     for key, value in snapshot.model_dump().items():
         _say(state, f"    {key}: {value}")
     if state.payload_mismatches:
-        _say(state, f"  Payload check: WARNING - not found in tool results: {', '.join(state.payload_mismatches)}")
+        _say(
+            state,
+            f"  Payload check: WARNING - not found in tool results: {', '.join(state.payload_mismatches)}",
+        )
     else:
         _say(state, "  Payload check: every number matches a tool result.")
 
 
 # ============================================================================ guardrails
 @input_guardrail(name="scope_and_privacy", run_in_parallel=False)
-async def scope_and_privacy_guardrail(ctx: RunContextWrapper[BudgetWiseState], agent, user_input):
+async def scope_and_privacy_guardrail(
+    ctx: RunContextWrapper[BudgetWiseState], agent, user_input
+):
     """Blocks investing/crypto/tax/retirement requests and card/account numbers before any model call."""
-    text = user_input if isinstance(user_input, str) else json.dumps(user_input, default=str)
+    text = (
+        user_input
+        if isinstance(user_input, str)
+        else json.dumps(user_input, default=str)
+    )
     check = check_user_input(text)
     return GuardrailFunctionOutput(output_info=check, tripwire_triggered=check.blocked)
 
 
 @output_guardrail(name="grounded_numbers")
-async def grounded_numbers_guardrail(ctx: RunContextWrapper[BudgetWiseState], agent, output):
+async def grounded_numbers_guardrail(
+    ctx: RunContextWrapper[BudgetWiseState], agent, output
+):
     """Every dollar amount in the final answer must appear in a tool result (or the user's question)."""
     state = ctx.context
     bad = find_ungrounded_amounts(str(output), state.tool_outputs + [state.question])
-    return GuardrailFunctionOutput(output_info={"ungrounded_amounts": bad}, tripwire_triggered=bool(bad))
+    return GuardrailFunctionOutput(
+        output_info={"ungrounded_amounts": bad}, tripwire_triggered=bool(bad)
+    )
 
 
 # ============================================================================ agent instructions
@@ -264,7 +322,9 @@ def planner_instructions(ctx: RunContextWrapper[BudgetWiseState], agent) -> str:
     return f"{PLANNER_INSTRUCTIONS}\nFINANCIAL SNAPSHOT (handoff payload from the Analyst):\n{payload}\n"
 
 
-def build_agents(analyst_server: MCPServerStdio, planner_server: MCPServerStdio) -> Agent:
+def build_agents(
+    analyst_server: MCPServerStdio, planner_server: MCPServerStdio
+) -> Agent:
     """Create both agents and wire the handoff. Returns the Analyst (the entry point)."""
     planner = Agent(
         name="Planner",
@@ -328,8 +388,12 @@ class ConsoleTracingProcessor(TracingProcessor):
 def configure(trace: bool = False) -> None:
     api_key, base_url = os.getenv("NRP_API_KEY"), os.getenv("NRP_BASE_URL")
     if not api_key or not base_url:
-        raise RuntimeError("NRP_API_KEY and NRP_BASE_URL must be set. Copy .env.example to .env and fill it in.")
-    set_default_openai_client(AsyncOpenAI(base_url=base_url, api_key=api_key), use_for_tracing=False)
+        raise RuntimeError(
+            "NRP_API_KEY and NRP_BASE_URL must be set. Copy .env.example to .env and fill it in."
+        )
+    set_default_openai_client(
+        AsyncOpenAI(base_url=base_url, api_key=api_key), use_for_tracing=False
+    )
     set_default_openai_api("chat_completions")
     if trace:
         set_trace_processors([ConsoleTracingProcessor()])
@@ -353,8 +417,8 @@ class Answer:
 class BudgetWise:
     """Opens the two MCP connections once and answers questions with the two-agent system.
 
-        async with BudgetWise() as bw:
-            answer = await bw.ask("How am I doing this month, and what should I do this week?")
+    async with BudgetWise() as bw:
+        answer = await bw.ask("How am I doing this month, and what should I do this week?")
     """
 
     def __init__(self, verbose: bool = True, trace: bool = False):
@@ -363,7 +427,9 @@ class BudgetWise:
     def _server(self, name: str, tools: list[str]) -> MCPServerStdio:
         return MCPServerStdio(
             name=name,
-            params=MCPServerStdioParams(command=sys.executable, args=[str(SERVER_SCRIPT)]),
+            params=MCPServerStdioParams(
+                command=sys.executable, args=[str(SERVER_SCRIPT)]
+            ),
             client_session_timeout_seconds=120,
             cache_tools_list=True,
             tool_filter=create_static_tool_filter(allowed_tool_names=tools),
@@ -373,7 +439,9 @@ class BudgetWise:
         configure(self.trace)
         if self.verbose:
             print("Loading knowledge base (ChromaDB)...", end=" ", flush=True)
-        chunks = mcp_server.build_knowledge_index()  # one-time embedding download happens here
+        chunks = (
+            mcp_server.build_knowledge_index()
+        )  # one-time embedding download happens here
         if self.verbose:
             print(f"{chunks} passages ready.")
         self._analyst_server = self._server("BudgetWise Data Tools", ANALYST_TOOLS)
@@ -387,9 +455,17 @@ class BudgetWise:
         await self._planner_server.__aexit__(*exc)
         await self._analyst_server.__aexit__(*exc)
 
-    async def _run(self, question: str, model_input: str) -> tuple[BudgetWiseState, object]:
+    async def _run(
+        self, question: str, model_input: str
+    ) -> tuple[BudgetWiseState, object]:
         state = BudgetWiseState(question=question, verbose=self.verbose)
-        result = await Runner.run(self.analyst, model_input, context=state, hooks=StepLogger(), max_turns=MAX_TURNS)
+        result = await Runner.run(
+            self.analyst,
+            model_input,
+            context=state,
+            hooks=StepLogger(),
+            max_turns=MAX_TURNS,
+        )
         return state, result
 
     async def ask(self, question: str) -> Answer:
@@ -399,29 +475,58 @@ class BudgetWise:
             state, result = await self._run(question, question)
         except InputGuardrailTripwireTriggered as e:
             check = e.guardrail_result.output.output_info
-            _say(state, f"\n[guardrail] Input blocked ({check.category}). No model was called.")
-            return Answer(question, check.message, "Input guardrail", False, [], f"input BLOCKED ({check.category})")
+            _say(
+                state,
+                f"\n[guardrail] Input blocked ({check.category}). No model was called.",
+            )
+            return Answer(
+                question,
+                check.message,
+                "Input guardrail",
+                False,
+                [],
+                f"input BLOCKED ({check.category})",
+            )
         except OutputGuardrailTripwireTriggered as e:
             bad = e.guardrail_result.output.output_info["ungrounded_amounts"]
-            _say(state, f"\n[guardrail] Grounding check failed: {', '.join(bad)} did not come from any tool. "
-                        "Retrying once with a correction note...")
+            _say(
+                state,
+                f"\n[guardrail] Grounding check failed: {', '.join(bad)} did not come from any tool. "
+                "Retrying once with a correction note...",
+            )
             retried = True
-            note = (f"{question}\n\n(Grounding check: a previous answer used {', '.join(bad)}, which no tool "
-                    "returned. Quote tool numbers exactly, with cents.)")
+            note = (
+                f"{question}\n\n(Grounding check: a previous answer used {', '.join(bad)}, which no tool "
+                "returned. Quote tool numbers exactly, with cents.)"
+            )
             try:
                 state, result = await self._run(question, note)
             except OutputGuardrailTripwireTriggered as e2:
                 bad2 = e2.guardrail_result.output.output_info["ungrounded_amounts"]
-                return Answer(question,
-                              "BudgetWise could not verify every number in its answer, so it is not showing "
-                              f"it (unverified: {', '.join(bad2)}). Please ask again.",
-                              "Output guardrail", False, [], f"grounding FAILED twice ({', '.join(bad2)})", retried=True)
+                return Answer(
+                    question,
+                    "BudgetWise could not verify every number in its answer, so it is not showing "
+                    f"it (unverified: {', '.join(bad2)}). Please ask again.",
+                    "Output guardrail",
+                    False,
+                    [],
+                    f"grounding FAILED twice ({', '.join(bad2)})",
+                    retried=True,
+                )
         answered_by = result.last_agent.name
         status = "input OK | grounding OK" + (" (after 1 retry)" if retried else "")
         if state.payload_mismatches:
             status += f" | payload WARNING: {', '.join(state.payload_mismatches)}"
-        return Answer(question, str(result.final_output), answered_by, answered_by == "Planner",
-                      state.tools_called, status, state.snapshot, retried)
+        return Answer(
+            question,
+            str(result.final_output),
+            answered_by,
+            answered_by == "Planner",
+            state.tools_called,
+            status,
+            state.snapshot,
+            retried,
+        )
 
 
 def show(answer: Answer) -> None:
@@ -444,7 +549,9 @@ async def main() -> None:
     args = sys.argv[1:]
     if "--reset-memory" in args:
         mcp_server.reset_memory()
-        print("Plan memory cleared (the sample plan from data/plan_history_seed.json comes back next run).")
+        print(
+            "Plan memory cleared (the sample plan from data/plan_history_seed.json comes back next run)."
+        )
         return
     trace, quiet = "--trace" in args, "--quiet" in args
     args = [a for a in args if a not in {"--trace", "--quiet"}]
@@ -452,8 +559,12 @@ async def main() -> None:
         if args:
             show(await bw.ask(" ".join(args)))
             return
-        print(f"BudgetWise AI (model: {MODEL}). Ask about spending, safe-to-spend, income, your goal,")
-        print("or ask for a plan: 'How am I doing this month, and what should I do this week?'  'quit' exits.")
+        print(
+            f"BudgetWise AI (model: {MODEL}). Ask about spending, safe-to-spend, income, your goal,"
+        )
+        print(
+            "or ask for a plan: 'How am I doing this month, and what should I do this week?'  'quit' exits."
+        )
         while True:
             question = input("\nYou: ").strip()
             if question.lower() in {"quit", "exit", ""}:
