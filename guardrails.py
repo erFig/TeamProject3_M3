@@ -7,17 +7,36 @@ agent.py wraps these in Agents SDK guardrails:
 
 Keeping the checks deterministic makes them free, fast, and easy to unit test (tests/test_guardrails.py).
 """
+
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 # ---------------------------------------------------------------- input guardrail
 OUT_OF_SCOPE = {
-    "investing": [r"\binvest(ing|ment|ments|or|ors)?\b", r"\bstocks?\b", r"\bindex funds?\b",
-                  r"\betfs?\b", r"\bmutual funds?\b", r"\bshares? of\b", r"\boptions trading\b"],
-    "crypto": [r"\bcrypto(currency|currencies)?\b", r"\bbitcoin\b", r"\bethereum\b", r"\bdogecoin\b"],
+    "investing": [
+        r"\binvest(ing|ment|ments|or|ors)?\b",
+        r"\bstocks?\b",
+        r"\bindex funds?\b",
+        r"\betfs?\b",
+        r"\bmutual funds?\b",
+        r"\bshares? of\b",
+        r"\boptions trading\b",
+    ],
+    "crypto": [
+        r"\bcrypto(currency|currencies)?\b",
+        r"\bbitcoin\b",
+        r"\bethereum\b",
+        r"\bdogecoin\b",
+    ],
     "taxes": [r"\btax(es)?\b", r"\btax return\b", r"\birs\b", r"\bw-?2\b", r"\b1099\b"],
-    "retirement": [r"\bretire(ment)?\b", r"\b401\s?\(?k\)?", r"\broth\b", r"\bira\b", r"\bpension\b"],
+    "retirement": [
+        r"\bretire(ment)?\b",
+        r"\b401\s?\(?k\)?",
+        r"\broth\b",
+        r"\bira\b",
+        r"\bpension\b",
+    ],
 }
 
 SENSITIVE = [
@@ -49,10 +68,14 @@ def check_user_input(text: str) -> InputCheck:
     lowered = text.lower()
     for what, pattern in SENSITIVE:
         if re.search(pattern, lowered):
-            return InputCheck(True, "sensitive_data", SENSITIVE_MESSAGE.format(what=what))
+            return InputCheck(
+                True, "sensitive_data", SENSITIVE_MESSAGE.format(what=what)
+            )
     for topic, patterns in OUT_OF_SCOPE.items():
         if any(re.search(p, lowered) for p in patterns):
-            return InputCheck(True, f"out_of_scope:{topic}", OUT_OF_SCOPE_MESSAGE.format(topic=topic))
+            return InputCheck(
+                True, f"out_of_scope:{topic}", OUT_OF_SCOPE_MESSAGE.format(topic=topic)
+            )
     return InputCheck(False)
 
 

@@ -1,7 +1,9 @@
 """BudgetWise tool tests - no LLM and no network needed (except a one-time embedding-model
 download for the knowledge-base tests). Run with:  python -m pytest
 
-Part 1 calls the tool functions directly; part 2 starts the real MCP server and calls them through MCP."""
+Part 1 calls the tool functions directly; part 2 starts the real MCP server and calls them through MCP.
+"""
+
 import asyncio
 import json
 import sys
@@ -94,9 +96,13 @@ def test_build_weekly_plan_flags_goal_not_on_track():
 
 
 def test_build_weekly_plan_rejects_bad_input():
-    assert "error" in tools.build_weekly_plan(999, "dining", 25)  # more than is safe to spend
+    assert "error" in tools.build_weekly_plan(
+        999, "dining", 25
+    )  # more than is safe to spend
     assert "error" in tools.build_weekly_plan(-5, "dining", 25)
-    assert "error" in tools.build_weekly_plan(40, "rent", 25)  # fixed cost, not discretionary
+    assert "error" in tools.build_weekly_plan(
+        40, "rent", 25
+    )  # fixed cost, not discretionary
     assert "error" in tools.build_weekly_plan(40, "dining", 80)  # cut too large
 
 
@@ -131,7 +137,9 @@ def test_knowledge_chunks_cover_all_documents():
 
 
 def test_knowledge_search_finds_relevant_guidance():
-    r = tools.search_budget_knowledge("how do I budget when my income changes every month", 3)
+    r = tools.search_budget_knowledge(
+        "how do I budget when my income changes every month", 3
+    )
     files = [x["source_file"] for x in r["results"]]
     assert "irregular_income_baseline.md" in files or "weekly_spending_plan.md" in files
     r = tools.search_budget_knowledge("emergency fund size", 2)
@@ -144,10 +152,18 @@ def test_knowledge_search_rejects_empty_query():
 
 # ---- Part 2: through the real MCP protocol ----
 SERVER = Path(__file__).resolve().parent.parent / "mcp_server.py"
-ALL_TOOLS = sorted([
-    "get_spending_by_category", "get_safe_to_spend", "get_income_variability", "get_goal_progress",
-    "build_weekly_plan", "save_plan", "check_last_plan", "search_budget_knowledge",
-])
+ALL_TOOLS = sorted(
+    [
+        "get_spending_by_category",
+        "get_safe_to_spend",
+        "get_income_variability",
+        "get_goal_progress",
+        "build_weekly_plan",
+        "save_plan",
+        "check_last_plan",
+        "search_budget_knowledge",
+    ]
+)
 
 
 async def _call(tool: str, args: dict | None = None):
@@ -181,11 +197,18 @@ def test_mcp_income_executes():
 
 
 def test_mcp_build_weekly_plan_executes():
-    _, data = asyncio.run(_call("build_weekly_plan", {"save_this_week": 41.56, "focus_category": "dining", "cut_percent": 25}))
+    _, data = asyncio.run(
+        _call(
+            "build_weekly_plan",
+            {"save_this_week": 41.56, "focus_category": "dining", "cut_percent": 25},
+        )
+    )
     assert data["daily_limit"] == 33.18
 
 
 def test_mcp_knowledge_search_executes():
     tools.build_knowledge_index()  # make sure the index exists before the server process uses it
-    _, data = asyncio.run(_call("search_budget_knowledge", {"query": "cut eating out", "top_k": 2}))
+    _, data = asyncio.run(
+        _call("search_budget_knowledge", {"query": "cut eating out", "top_k": 2})
+    )
     assert len(data["results"]) == 2
