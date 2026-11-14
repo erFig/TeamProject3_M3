@@ -258,6 +258,21 @@ def build_weekly_plan(
     daily_limit = round(spending_allowance / 7, 2)
     focus_weekly_average = round(last_30[focus_category] * 7 / 30, 2)
     focus_cap = round(focus_weekly_average * (100 - cut_percent) / 100, 2)
+
+    # Keep the new cap from exceeding the previous plan's cap.
+    previous_plans = [
+        p for p in _load_memory()["plans"]
+        if p["focus_category"] == focus_category
+        and date.fromisoformat(p["week_start"]) < as_of
+]
+
+    if previous_plans:
+        previous_plan = max(
+            previous_plans,
+            key=lambda p: (p["week_start"], p["saved_at"])
+    )
+        previous_cap = float(previous_plan["focus_category_cap"])
+        focus_cap = round(min(focus_cap, previous_cap), 2)
     goal = get_goal_progress()
     return {
         "week_start": as_of.isoformat(),
@@ -279,7 +294,7 @@ def build_weekly_plan(
             "weekly_spending_allowance = weekly_safe_to_spend - save_this_week",
             "daily_limit = weekly_spending_allowance / 7",
             "focus_category_weekly_average = last 30 days in that category x 7 / 30",
-            "focus_category_cap = weekly average x (100 - cut_percent) / 100",
+            "focus_category_cap = minimum of the calculated cap and the previous cap for the same category, if one exists",
         ],
     }
 
